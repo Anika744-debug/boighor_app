@@ -1,0 +1,6 @@
+{
+  "name": "গল্পঘর",
+  "description": "গল্পঘর (GolpoGhor) - Private Bengali literary story reading and publishing platform",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

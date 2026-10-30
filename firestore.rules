@@ -1,0 +1,153 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner() {
+      return isSignedIn() && (
+        request.auth.token.email == 'mdnajrulislam771@gmail.com' ||
+        request.auth.token.email == 'mdnajulislam771@gmail.com'
+      );
+    }
+
+    function isUserSelf(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isWriter() {
+      return isSignedIn() && (
+        isOwner() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'WRITER')
+      );
+    }
+
+    function isValidUser(data) {
+      return data.uid is string &&
+             data.email is string &&
+             data.displayName is string &&
+             data.role in ['OWNER', 'WRITER', 'READER'] &&
+             data.isSuspended is bool &&
+             (!('createdAt' in data) || data.createdAt is timestamp) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    function isValidStory(data) {
+      return data.id is string &&
+             data.title is string && data.title.size() > 0 &&
+             data.authorId is string &&
+             data.authorName is string &&
+             (!('description' in data) || data.description is string) &&
+             (!('coverImageUrl' in data) || data.coverImageUrl is string) &&
+             (!('genre' in data) || data.genre is string) &&
+             (!('isCompleted' in data) || data.isCompleted is bool) &&
+             (!('viewCount' in data) || data.viewCount is int) &&
+             (!('createdAt' in data) || data.createdAt is timestamp) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    function isValidPart(data) {
+      return data.id is string &&
+             data.storyId is string &&
+             data.authorId is string &&
+             data.partNumber is int &&
+             data.title is string && data.title.size() > 0 &&
+             data.status in ['DRAFT', 'SCHEDULED', 'PUBLISHED'] &&
+             (!('content' in data) || data.content is string) &&
+             (!('viewCount' in data) || data.viewCount is int) &&
+             (!('scheduledAt' in data) || data.scheduledAt is timestamp || data.scheduledAt == null) &&
+             (!('publishedAt' in data) || data.publishedAt is timestamp || data.publishedAt == null) &&
+             (!('createdAt' in data) || data.createdAt is timestamp) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    function isValidReview(data) {
+      return data.id is string &&
+             data.storyId is string &&
+             data.partId is string &&
+             data.userId is string &&
+             data.comment is string && data.comment.size() > 0 &&
+             (!('userName' in data) || data.userName is string) &&
+             (!('selectedPassage' in data) || data.selectedPassage is string) &&
+             (!('starRating' in data) || data.starRating is int) &&
+             (!('reactionEmoji' in data) || data.reactionEmoji is string) &&
+             (!('ownerReply' in data) || data.ownerReply is string) &&
+             (!('createdAt' in data) || data.createdAt is timestamp) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    function isValidReadingProgress(data) {
+      return data.id is string &&
+             data.userId is string &&
+             data.storyId is string &&
+             data.partId is string &&
+             data.progressPercent is int &&
+             (!('scrollOffset' in data) || data.scrollOffset is int) &&
+             (!('isCompleted' in data) || data.isCompleted is bool) &&
+             (!('lastReadAt' in data) || data.lastReadAt is timestamp);
+    }
+
+    function isValidNotification(data) {
+      return data.id is string &&
+             data.userId is string &&
+             data.title is string &&
+             data.message is string &&
+             data.isRead is bool &&
+             (!('storyId' in data) || data.storyId is string) &&
+             (!('partId' in data) || data.partId is string) &&
+             (!('createdAt' in data) || data.createdAt is timestamp);
+    }
+
+    // 1. Users collection
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isUserSelf(userId) &&
+                       (isOwner() ? (request.resource.data.role in ['OWNER', 'WRITER', 'READER']) : request.resource.data.role == 'READER') &&
+                       isValidUser(request.resource.data);
+      allow update: if (isOwner() || (isUserSelf(userId) && request.resource.data.role == resource.data.role && request.resource.data.isSuspended == resource.data.isSuspended)) &&
+                       isValidUser(request.resource.data);
+      allow delete: if isOwner();
+    }
+
+    // 2. Stories collection
+    match /stories/{storyId} {
+      allow read: if isSignedIn() && (resource.data.isPublished == true || isOwner() || resource.data.authorId == request.auth.uid);
+      allow create: if isSignedIn() && (isOwner() || isWriter()) && request.resource.data.authorId == request.auth.uid && isValidStory(request.resource.data);
+      allow update: if isSignedIn() && (isOwner() || (resource.data.authorId == request.auth.uid && isWriter())) && isValidStory(request.resource.data);
+      allow delete: if isSignedIn() && (isOwner() || resource.data.authorId == request.auth.uid);
+    }
+
+    // 3. Parts collection
+    match /parts/{partId} {
+      allow read: if isSignedIn() && (resource.data.status == 'PUBLISHED' || resource.data.authorId == request.auth.uid || isOwner());
+      allow create: if isSignedIn() && (isOwner() || isWriter()) && request.resource.data.authorId == request.auth.uid && isValidPart(request.resource.data);
+      allow update: if isSignedIn() && (isOwner() || resource.data.authorId == request.auth.uid) && isValidPart(request.resource.data);
+      allow delete: if isSignedIn() && (isOwner() || resource.data.authorId == request.auth.uid);
+    }
+
+    // 4. Reviews collection
+    match /reviews/{reviewId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid && isValidReview(request.resource.data);
+      allow update: if isSignedIn() && (request.auth.uid == resource.data.userId || isOwner()) && isValidReview(request.resource.data);
+      allow delete: if isSignedIn() && (request.auth.uid == resource.data.userId || isOwner());
+    }
+
+    // 5. ReadingProgress collection
+    match /readingProgress/{progressId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isOwner());
+      allow create, update: if isSignedIn() && request.resource.data.userId == request.auth.uid && isValidReadingProgress(request.resource.data);
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isOwner());
+    }
+
+    // 6. Notifications collection
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isOwner());
+      allow create: if isSignedIn() && isValidNotification(request.resource.data);
+      allow update, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isOwner()) && isValidNotification(request.resource.data);
+    }
+  }
+}

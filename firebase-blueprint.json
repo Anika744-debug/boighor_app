@@ -1,0 +1,137 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role-based access control (OWNER, WRITER, READER)",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "description": "User email address" },
+        "displayName": { "type": "string", "description": "Display name in Bengali/English" },
+        "role": { "type": "string", "enum": ["OWNER", "WRITER", "READER"], "description": "Security role" },
+        "avatarLetter": { "type": "string", "description": "Single letter avatar representation" },
+        "isSuspended": { "type": "boolean", "description": "Account suspension status" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp via serverTimestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp via serverTimestamp" }
+      },
+      "required": ["uid", "email", "displayName", "role", "isSuspended"]
+    },
+    "Story": {
+      "title": "Story",
+      "description": "Bengali literary story book with serial publication metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique story ID" },
+        "title": { "type": "string", "description": "Story title" },
+        "description": { "type": "string", "description": "Story synopsis" },
+        "authorId": { "type": "string", "description": "UID of author" },
+        "authorName": { "type": "string", "description": "Author display name" },
+        "coverImageUrl": { "type": "string", "description": "Cover art image URL" },
+        "isCompleted": { "type": "boolean", "description": "Whether serial story is finished" },
+        "genre": { "type": "string", "description": "Literary genre" },
+        "viewCount": { "type": "integer", "description": "Total view count" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last updated timestamp" }
+      },
+      "required": ["id", "title", "authorId", "authorName"]
+    },
+    "Part": {
+      "title": "Part",
+      "description": "Story chapter or episode with draft/scheduled/published state",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique part ID" },
+        "storyId": { "type": "string", "description": "Foreign key to parent Story" },
+        "authorId": { "type": "string", "description": "UID of author" },
+        "partNumber": { "type": "integer", "description": "Sequential chapter index" },
+        "title": { "type": "string", "description": "Chapter title" },
+        "content": { "type": "string", "description": "Body text of chapter" },
+        "status": { "type": "string", "enum": ["DRAFT", "SCHEDULED", "PUBLISHED"], "description": "Publication status" },
+        "scheduledAt": { "type": "string", "format": "date-time", "description": "Optional scheduled publication timestamp" },
+        "publishedAt": { "type": "string", "format": "date-time", "description": "Optional publication timestamp" },
+        "viewCount": { "type": "integer", "description": "Part read count" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp" }
+      },
+      "required": ["id", "storyId", "authorId", "partNumber", "title", "status"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Passage-selected reader feedback, rating, and owner reply",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Review unique ID" },
+        "storyId": { "type": "string", "description": "Story ID" },
+        "partId": { "type": "string", "description": "Part ID" },
+        "userId": { "type": "string", "description": "Reviewer UID" },
+        "userName": { "type": "string", "description": "Reviewer name" },
+        "selectedPassage": { "type": "string", "description": "Highlighted story quote" },
+        "comment": { "type": "string", "description": "Reader review comment text" },
+        "starRating": { "type": "integer", "description": "Rating out of 5" },
+        "reactionEmoji": { "type": "string", "description": "Emoji reaction" },
+        "ownerReply": { "type": "string", "description": "Author/Owner reply text" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp" }
+      },
+      "required": ["id", "storyId", "partId", "userId", "comment"]
+    },
+    "ReadingProgress": {
+      "title": "ReadingProgress",
+      "description": "Reader progress bookmark per chapter",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique progress ID: userId_storyId_partId" },
+        "userId": { "type": "string", "description": "Reader UID" },
+        "storyId": { "type": "string", "description": "Story ID" },
+        "partId": { "type": "string", "description": "Part ID" },
+        "scrollOffset": { "type": "integer", "description": "Scroll position offset" },
+        "progressPercent": { "type": "integer", "description": "Percentage completed 0-100" },
+        "isCompleted": { "type": "boolean", "description": "Whether chapter finished" },
+        "lastReadAt": { "type": "string", "format": "date-time", "description": "Last read timestamp" }
+      },
+      "required": ["id", "userId", "storyId", "partId", "progressPercent"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "User notification for published chapters, role changes, or replies",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Notification ID" },
+        "userId": { "type": "string", "description": "Recipient UID" },
+        "title": { "type": "string", "description": "Notification headline" },
+        "message": { "type": "string", "description": "Notification details" },
+        "storyId": { "type": "string", "description": "Optional story ID" },
+        "partId": { "type": "string", "description": "Optional part ID" },
+        "isRead": { "type": "boolean", "description": "Read flag" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["id", "userId", "title", "message", "isRead"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles with roles and status"
+    },
+    "/stories/{storyId}": {
+      "schema": { "$ref": "#/entities/Story" },
+      "description": "Published and authored Bengali story books"
+    },
+    "/parts/{partId}": {
+      "schema": { "$ref": "#/entities/Part" },
+      "description": "Chapters with drafts, schedules, and published states"
+    },
+    "/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/Review" },
+      "description": "Passage reviews and comments"
+    },
+    "/readingProgress/{progressId}": {
+      "schema": { "$ref": "#/entities/ReadingProgress" },
+      "description": "User reading history and bookmarks"
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "User notifications"
+    }
+  }
+}
