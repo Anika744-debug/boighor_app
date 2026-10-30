@@ -18,7 +18,7 @@ enum class UserStatus {
 data class User(
     @PrimaryKey val id: String,
     val username: String,
-    val passwordHash: String = "",
+    val passwordHash: String,
     val displayName: String,
     val role: UserRole,
     val status: UserStatus = UserStatus.ACTIVE,

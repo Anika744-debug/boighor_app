@@ -406,16 +406,8 @@ class FirestoreManager(val db: FirebaseFirestore?) {
                       currentEmail.equals("mdnajulislam771@gmail.com", ignoreCase = true)
 
         // 1. Stories Sync (Independent Operation)
-        // Public story reading model:
-        // Readers fetch published stories using whereEqualTo("isPublished", true).
-        // Owners can query all stories including drafts.
         try {
-            val storyQuery = if (isOwner) {
-                firestore.collection("stories")
-            } else {
-                firestore.collection("stories").whereEqualTo("isPublished", true)
-            }
-            val storyDocs = storyQuery.get().await()
+            val storyDocs = firestore.collection("stories").get().await()
             val storiesList = storyDocs.documents.mapNotNull { doc ->
                 try {
                     val id = doc.getString("id") ?: doc.id

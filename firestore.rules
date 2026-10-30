@@ -114,7 +114,7 @@ service cloud.firestore {
 
     // 2. Stories collection
     match /stories/{storyId} {
-      allow read: if isSignedIn() && (resource.data.isPublished == true || isOwner() || resource.data.authorId == request.auth.uid);
+      allow read: if isSignedIn();
       allow create: if isSignedIn() && (isOwner() || isWriter()) && request.resource.data.authorId == request.auth.uid && isValidStory(request.resource.data);
       allow update: if isSignedIn() && (isOwner() || (resource.data.authorId == request.auth.uid && isWriter())) && isValidStory(request.resource.data);
       allow delete: if isSignedIn() && (isOwner() || resource.data.authorId == request.auth.uid);

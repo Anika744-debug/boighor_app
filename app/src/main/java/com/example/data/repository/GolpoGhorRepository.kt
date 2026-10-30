@@ -29,13 +29,6 @@ class GolpoGhorRepository(
 
     companion object {
         const val ADMIN_EMAIL = "mdnajrulislam771@gmail.com"
-        const val ADMIN_EMAIL_ALT = "mdnajulislam771@gmail.com"
-
-        fun isOwnerEmail(email: String?): Boolean {
-            if (email == null) return false
-            val clean = email.trim().lowercase()
-            return clean == ADMIN_EMAIL || clean == ADMIN_EMAIL_ALT
-        }
 
         fun hashPassword(password: String): String {
             val md = java.security.MessageDigest.getInstance("SHA-256")
@@ -263,7 +256,7 @@ class GolpoGhorRepository(
         //    Admin role is ONLY granted if isEmailVerified == true.
         //    If not verified, user cannot hold the ADMIN role.
         // 2. No other email can EVER hold the ADMIN role.
-        val isAdminEmail = isOwnerEmail(user.username)
+        val isAdminEmail = user.username.equals(ADMIN_EMAIL, ignoreCase = true)
         if (isAdminEmail) {
             if (user.isEmailVerified) {
                 if (user.role != UserRole.ADMIN) {
@@ -299,7 +292,7 @@ class GolpoGhorRepository(
         val adminUser = dao.getUserById(adminUserId)
         if (adminUser == null ||
             adminUser.role != UserRole.ADMIN ||
-            !isOwnerEmail(adminUser.username) ||
+            !adminUser.username.equals(ADMIN_EMAIL, ignoreCase = true) ||
             !adminUser.isEmailVerified
         ) {
             return@withContext Result.failure(SecurityException("শুধুমাত্র যাচাইকৃত অ্যাডমিন (Mdnajrulislam771@gmail.com) রোল পরিবর্তন করার অনুমতি রাখেন।"))
@@ -308,7 +301,7 @@ class GolpoGhorRepository(
         val targetUser = dao.getUserById(targetUserId)
             ?: return@withContext Result.failure(IllegalArgumentException("টার্গেট ব্যবহারকারী খুঁজে পাওয়া যায়নি।"))
 
-        if (isOwnerEmail(targetUser.username)) {
+        if (targetUser.username.equals(ADMIN_EMAIL, ignoreCase = true)) {
             return@withContext Result.failure(IllegalStateException("অ্যাডমিন অ্যাকাউন্টের ভূমিকা পরিবর্তন করা যাবে না।"))
         }
 

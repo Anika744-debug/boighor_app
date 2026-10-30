@@ -66,11 +66,10 @@ fun StoriesBrowseScreen(viewModel: MainViewModel) {
 
     // Filter stories accessible to user
     val accessibleStories = remember(stories, allParts, currentUser, searchQuery, selectedGenre, selectedSort) {
-        val isPrivileged = currentUser?.role == UserRole.ADMIN || currentUser?.role == UserRole.WRITER
         val base = stories.filter { story ->
-            if (!isPrivileged) {
-                // Public Story Access: Readers see all published stories
-                story.isPublished && !story.isDeleted
+            if (currentUser?.role == UserRole.READER) {
+                // Reader only sees published stories with at least 1 published part
+                story.isPublished && allParts.any { it.storyId == story.id && it.status == PartStatus.PUBLISHED }
             } else true
         }.filter { story ->
             if (searchQuery.isBlank()) true
@@ -560,7 +559,7 @@ fun StoriesBrowseScreen(viewModel: MainViewModel) {
                     HorizontalDivider(color = appColors.border)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "গল্পের পর্বসমূহ (${accessibleParts.size} টি)",
+                        text = "গল্পের পর্বসমূহ (${accessibleParts.size} টি উন্মুক্ত)",
                         fontFamily = LocalReadingFont.current,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
@@ -568,20 +567,9 @@ fun StoriesBrowseScreen(viewModel: MainViewModel) {
                     )
                 }
 
-                // Parts list: for writers/admin show all parts; for readers show published parts with sequential lock state
-                val isPrivileged = currentUser?.role == UserRole.ADMIN || (currentUser?.role == UserRole.WRITER && story.authorId == currentUser?.id)
-                val partsToDisplay = if (isPrivileged) partsForStory else partsForStory.filter { it.status == PartStatus.PUBLISHED && !it.isDeleted }
-
-                items(partsToDisplay) { part ->
-                    val isPartAccessible = SequentialReadingHelper.isPartAccessible(
-                        story = story,
-                        part = part,
-                        currentUser = currentUser,
-                        userReadingProgress = readingProgress,
-                        userOverrides = userOverrides,
-                        allPartsForStory = partsForStory
-                    )
-                    val isUnlocked = isPrivileged || isPartAccessible
+                // Parts list with lock / unlock indicators
+                items(partsForStory) { part ->
+                    val isUnlocked = accessibleParts.any { it.id == part.id }
                     val isPublished = part.status == PartStatus.PUBLISHED
                     val userProg = readingProgress.find { it.userId == currentUser?.id && it.partId == part.id }
 
@@ -649,7 +637,7 @@ fun StoriesBrowseScreen(viewModel: MainViewModel) {
                                     Text(
                                         text = when {
                                             !isPublished -> "অপ্রকাশিত (ড্রাফট)"
-                                            !isUnlocked -> "লক করা (ধারাবাহিক পঠন প্রয়োজন)"
+                                            !isUnlocked -> "লক করা (পূর্ববর্তী পর্ব সম্পন্ন করুন)"
                                             userProg?.isCompleted == true -> "পড়া শেষ হয়েছে"
                                             userProg != null -> "${userProg.progressPercent}% পড়া হয়েছে"
                                             else -> "এখনই পড়ুন"

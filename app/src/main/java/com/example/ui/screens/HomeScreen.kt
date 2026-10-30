@@ -63,11 +63,10 @@ fun HomeScreen(
 
     // Filtered published stories
     val filteredStories = remember(stories, allParts, currentUser, searchQuery, selectedSort) {
-        val isPrivileged = currentUser?.role == UserRole.ADMIN || currentUser?.role == UserRole.WRITER
         val base = stories.filter { story ->
-            if (!isPrivileged) {
-                // Public Story Access: Show all published stories
-                story.isPublished && !story.isDeleted
+            // If reader, only show stories that are published and have at least 1 published part
+            if (currentUser?.role == UserRole.READER) {
+                story.isPublished && allParts.any { it.storyId == story.id && it.status == PartStatus.PUBLISHED }
             } else true
         }.filter { story ->
             if (searchQuery.isBlank()) true

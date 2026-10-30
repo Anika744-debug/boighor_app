@@ -446,20 +446,15 @@ fun ReadingScreen(
                                 tint = moodColors.textSecondary,
                                 modifier = Modifier.size(48.dp)
                             )
-                            val isDraft = currentPart?.status != PartStatus.PUBLISHED || (currentPart.scheduledAt != null && currentPart.scheduledAt > System.currentTimeMillis())
                             Text(
-                                text = if (isDraft) "পর্বটি অপ্রকাশিত রয়েছে" else "পর্বটি বর্তমানে লক করা আছে",
+                                text = "পর্বটি বর্তমানে লক করা আছে",
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = moodColors.text,
                                 textAlign = TextAlign.Center
                             )
                             Text(
-                                text = if (isDraft) {
-                                    "এই পর্বটি এখনো প্রকাশিত হয়নি বা খসড়া হিসেবে সংরক্ষিত রয়েছে। শুধুমাত্র অনুমোদিত লেখক বা অ্যাডমিন এটি পড়তে পারেন।"
-                                } else {
-                                    "ধারাবাহিক পঠন নিয়মানুযায়ী পূর্ববর্তী পর্বসমূহ সফলভাবে সম্পন্ন করার পর এই পর্বটি উন্মুক্ত হবে। অথবা লেখকের অনুমোদন পেলে আপনি সরাসরি পড়তে পারবেন।"
-                                },
+                                text = "ধারাবাহিক পঠন নিয়মানুযায়ী পূর্ববর্তী পর্বসমূহ সফলভাবে সম্পন্ন করার পর এই পর্বটি উন্মুক্ত হবে। অথবা লেখকের অনুমোদন পেলে আপনি সরাসরি পড়তে পারবেন।",
                                 fontSize = 14.sp,
                                 color = moodColors.textSecondary,
                                 textAlign = TextAlign.Center

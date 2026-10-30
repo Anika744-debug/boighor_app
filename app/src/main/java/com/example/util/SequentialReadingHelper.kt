@@ -10,94 +10,78 @@ object SequentialReadingHelper {
 
     /**
      * Determines whether a given user is allowed to access and read a specific part.
-     * Sequential Reading Mode & Gating:
-     * - Admin/Owner has unrestricted access to all parts (including drafts and scheduled).
-     * - The Writer/Author has unrestricted access to their own story parts.
-     * - For ordinary Readers:
-     *   - Draft and future scheduled parts are never accessible.
-     *   - Story and part must be published.
-     *   - If sequential reading is enabled:
-     *     - Part 1 is always accessible.
-     *     - Part N (> 1) requires prior part completion (progress.isCompleted == true)
-     *       OR explicit manual unlock/override (userOverrides or isManuallyUnlocked).
-     *   - If sequential reading is disabled, all published parts are accessible.
      */
     fun isPartAccessible(
         story: Story?,
         part: StoryPart?,
         currentUser: User?,
-        userReadingProgress: List<ReadingProgress> = emptyList(),
-        userOverrides: List<UserAccessOverride> = emptyList(),
-        allPartsForStory: List<StoryPart> = emptyList()
+        userReadingProgress: List<ReadingProgress>,
+        userOverrides: List<UserAccessOverride>,
+        allPartsForStory: List<StoryPart>
     ): Boolean {
         if (story == null || part == null) return false
 
-        // Owner/Admin has global access to all parts (including drafts and scheduled)
+        // Owner/Admin has global access to all parts
         if (currentUser?.role == UserRole.ADMIN) return true
 
-        // Writer can access their own story parts (including drafts and scheduled)
+        // Writer can access their own story parts
         if (currentUser?.role == UserRole.WRITER && story.authorId == currentUser.id) return true
 
-        // Drafts and future scheduled parts can NEVER be accessed by ordinary readers
-        val isPartPublished = part.status == PartStatus.PUBLISHED &&
-                (part.scheduledAt == null || part.scheduledAt <= System.currentTimeMillis()) &&
-                !part.isDeleted
-        if (!isPartPublished) return false
-
-        // Story itself must be published
-        val isStoryPublished = story.isPublished && !story.isDeleted
-        if (!isStoryPublished) return false
+        // A reader can NEVER access an unpublished part or future scheduled part,
+        // even if a manual override was attempted!
+        val isPublished = part.status == PartStatus.PUBLISHED &&
+                (part.scheduledAt == null || part.scheduledAt <= System.currentTimeMillis())
+        if (!isPublished) return false
 
         // If sequential reading is disabled for this story, all published parts are accessible
         if (!story.sequentialReadingEnabled) return true
 
-        // Published parts ordered by partNumber
+        val userId = currentUser?.id ?: "guest"
+
+        // 1. Check if reader has an active manual unlock for this part
+        if (userOverrides.any { (it.userId == userId || it.userId == "guest") && it.partId == part.id && it.isUnlocked }) {
+            return true
+        }
+
+        // 2. Check if this part has already been completed by the reader (allowed to reread)
+        val partProgress = userReadingProgress.find { (it.userId == userId || it.userId == "guest" || currentUser == null) && it.partId == part.id }
+        if (partProgress != null && (partProgress.isCompleted || partProgress.progressPercent >= 90 || partProgress.reachedEndOfPart)) {
+            return true
+        }
+
+        // 3. Sequential ordering: find published parts sorted by partNumber
         val publishedParts = allPartsForStory
             .filter { it.status == PartStatus.PUBLISHED && (it.scheduledAt == null || it.scheduledAt <= System.currentTimeMillis()) && !it.isDeleted }
             .sortedBy { it.partNumber }
 
-        // The first published part (Part 1) is always accessible
-        val firstPart = publishedParts.firstOrNull() ?: part
-        if (part.id == firstPart.id || part.partNumber <= firstPart.partNumber) {
-            return true
+        if (publishedParts.isEmpty()) return false
+
+        // The very first published part is ALWAYS accessible to any reader
+        if (publishedParts.first().id == part.id) return true
+
+        // For any subsequent part, check if the immediately preceding published part is completed or reached end
+        val partIndex = publishedParts.indexOfFirst { it.id == part.id }
+        if (partIndex > 0) {
+            val previousPart = publishedParts[partIndex - 1]
+            val prevProgress = userReadingProgress.find { (it.userId == userId || it.userId == "guest" || currentUser == null) && it.partId == previousPart.id }
+            if (prevProgress != null && (prevProgress.isCompleted || prevProgress.progressPercent >= 90 || prevProgress.reachedEndOfPart)) {
+                return true
+            }
         }
 
-        // Check for author/admin manual unlock override
-        val hasManualOverride = userOverrides.any {
-            it.userId == currentUser?.id &&
-            it.storyId == story.id &&
-            (it.partId == part.id || it.partId == null) &&
-            it.isUnlocked
-        }
-        if (hasManualOverride) return true
-
-        // Check if explicitly unlocked in reading progress
-        val currentPartProgress = userReadingProgress.find { it.userId == currentUser?.id && it.partId == part.id }
-        if (currentPartProgress?.isManuallyUnlocked == true) return true
-
-        // Check sequential reading progression: preceding published part must be completed
-        val previousPart = publishedParts
-            .filter { it.partNumber < part.partNumber }
-            .maxByOrNull { it.partNumber }
-
-        if (previousPart == null) return true
-
-        val prevProgress = userReadingProgress.find { it.userId == currentUser?.id && it.partId == previousPart.id }
-        return prevProgress?.isCompleted == true || prevProgress?.isManuallyUnlocked == true
+        return false
     }
 
     /**
-     * Returns the parts that should be visible to the user.
-     * - Writer / Admin sees all non-deleted parts (including drafts and scheduled).
-     * - If sequential reading is disabled, readers see all published parts.
-     * - If sequential reading is enabled, future locked parts are hidden, returning only accessible parts.
+     * Returns ONLY the parts that should be visible to the user.
+     * For readers with sequential reading enabled, ALL future locked parts are COMPLETELY HIDDEN.
      */
     fun getVisiblePartsForUser(
         story: Story?,
         allPartsForStory: List<StoryPart>,
         currentUser: User?,
-        userReadingProgress: List<ReadingProgress> = emptyList(),
-        userOverrides: List<UserAccessOverride> = emptyList()
+        userReadingProgress: List<ReadingProgress>,
+        userOverrides: List<UserAccessOverride>
     ): List<StoryPart> {
         if (story == null) return emptyList()
 
@@ -108,25 +92,40 @@ object SequentialReadingHelper {
             return allPartsForStory.filter { !it.isDeleted }.sortedBy { it.partNumber }
         }
 
+        // Reader sees only published parts
         val publishedParts = allPartsForStory
             .filter { it.status == PartStatus.PUBLISHED && (it.scheduledAt == null || it.scheduledAt <= System.currentTimeMillis()) && !it.isDeleted }
             .sortedBy { it.partNumber }
 
+        // If sequential mode is turned off, all published parts are visible
         if (!story.sequentialReadingEnabled) {
             return publishedParts
         }
 
-        // Return accessible parts for sequential reading (future locked parts hidden)
-        return publishedParts.filter { part ->
-            isPartAccessible(
+        // In sequential reading mode, readers only see:
+        // 1. Previously read/completed parts
+        // 2. The current accessible part
+        // 3. Parts explicitly manually unlocked
+        // ALL future locked parts are omitted completely!
+        val visibleList = mutableListOf<StoryPart>()
+        for (part in publishedParts) {
+            val accessible = isPartAccessible(
                 story = story,
                 part = part,
                 currentUser = currentUser,
                 userReadingProgress = userReadingProgress,
                 userOverrides = userOverrides,
-                allPartsForStory = publishedParts
+                allPartsForStory = allPartsForStory
             )
+            if (accessible) {
+                visibleList.add(part)
+            } else {
+                // Future parts must remain genuinely undiscoverable to readers!
+                // Stop adding further parts so they are completely hidden.
+                break
+            }
         }
+        return visibleList
     }
 
     /**
